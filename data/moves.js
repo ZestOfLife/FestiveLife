@@ -13952,7 +13952,11 @@ exports.BattleMovedex = {
 			move.type = '???';
 			this.add('-activate', pokemon, 'move: Struggle');
 		},
-		struggleRecoil: true,
+		self: {
+			onHit: function (source) {
+				this.directDamage(source.maxhp / 4, source, source, {id: 'strugglerecoil'});
+			},
+		},
 		secondary: false,
 		target: "randomNormal",
 		type: "Normal",

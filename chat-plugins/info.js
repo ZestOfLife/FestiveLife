@@ -151,8 +151,8 @@ exports.commands = {
 				let punishDesc = ``;
 				if (punishment) {
 					const [punishType, userid, expireTime, reason] = punishment;
-					punishDesc = Punishments.roomPunishmentTypes.get(punishType);
-					if (!punishDesc) punishDesc = `punished`;
+					punishDesc = `banned`;
+					if (punishType === 'BLACKLIST') punishDesc = `blacklisted`;
 					if (userid !== targetUser.userid) punishDesc += ` as ${userid}`;
 
 					let expiresIn = new Date(expireTime).getTime() - Date.now();
@@ -240,14 +240,23 @@ exports.commands = {
 	ipsearchhelp: ["/ipsearch [ip|range|host] - Find all users with specified IP, IP range, or host. Requires: & ~"],
 
 	/*********************************************************
-	 * Client fallback
+	 * Shortcuts
 	 *********************************************************/
 
-	unignore: 'ignore',
-	ignore: function (target, room, user) {
-		if (!room) this.errorReply(`In PMs, this command can only be used by itself to ignore the person you're talking to: "/${this.cmd}", not "/${this.cmd} ${target}"`);
-		this.errorReply(`You're using a custom client that doesn't support the ignore command.`);
+	inv: 'invite',
+	invite: function (target, room, user) {
+		if (!target) return this.parse('/help invite');
+		target = this.splitTarget(target);
+		if (!this.targetUser) {
+			return this.errorReply("User " + this.targetUsername + " not found.");
+		}
+		let targetRoom = (target ? Rooms.search(target) : room);
+		if (!targetRoom) {
+			return this.errorReply("Room " + target + " not found.");
+		}
+		return this.parse('/msg ' + this.targetUsername + ', /invite ' + targetRoom.id);
 	},
+	invitehelp: ["/invite [username], [roomname] - Invites the player [username] to join the room [roomname]."],
 
 	/*********************************************************
 	 * Data Search Tools
@@ -1199,7 +1208,7 @@ exports.commands = {
 		if (!this.runBroadcast()) return;
 		if (this.broadcasting && (room.id === 'lobby' || room.battle)) return this.errorReply("This command is too spammy for lobby/battles.");
 		this.sendReplyBox(
-			"<strong>Room drivers (%)</strong> can use:<br />" +
+			"Room drivers (%) can use:<br />" +
 			"- /warn OR /k <em>username</em>: warn a user and show the Pok&eacute;mon Showdown rules<br />" +
 			"- /mute OR /m <em>username</em>: 7 minute mute<br />" +
 			"- /hourmute OR /hm <em>username</em>: 60 minute mute<br />" +
@@ -1208,24 +1217,24 @@ exports.commands = {
 			"- /modlog <em>username</em>: search the moderator log of the room<br />" +
 			"- /modnote <em>note</em>: adds a moderator note that can be read through modlog<br />" +
 			"<br />" +
-			"<strong>Room moderators (@)</strong> can also use:<br />" +
+			"Room moderators (@) can also use:<br />" +
 			"- /roomban OR /rb <em>username</em>: bans user from the room<br />" +
 			"- /roomunban <em>username</em>: unbans user from the room<br />" +
 			"- /roomvoice <em>username</em>: appoint a room voice<br />" +
 			"- /roomdevoice <em>username</em>: remove a room voice<br />" +
+			"- /modchat <em>[off/autoconfirmed/+]</em>: set modchat level<br />" +
 			"- /staffintro <em>intro</em>: sets the staff introduction that will be displayed for all staff joining the room<br />" +
-			"- /roomsettings: change a variety of room settings, namely modchat<br />" +
 			"<br />" +
-			"<strong>Room owners (#)</strong> can also use:<br />" +
+			"Room owners (#) can also use:<br />" +
 			"- /roomintro <em>intro</em>: sets the room introduction that will be displayed for all users joining the room<br />" +
 			"- /rules <em>rules link</em>: set the room rules link seen when using /rules<br />" +
 			"- /roommod, /roomdriver <em>username</em>: appoint a room moderator/driver<br />" +
 			"- /roomdemod, /roomdedriver <em>username</em>: remove a room moderator/driver<br />" +
 			"- /roomdeauth <em>username</em>: remove all room auth from a user<br />" +
+			"- /modchat <em>[%/@/#]</em>: set modchat level<br />" +
 			"- /declare <em>message</em>: make a large blue declaration to the room<br />" +
 			"- !htmlbox <em>HTML code</em>: broadcasts a box of HTML code to the room<br />" +
 			"- !showimage <em>[url], [width], [height]</em>: shows an image to the room<br />" +
-			"- /roomsettings: change a variety of room settings, including modchat, capsfilter, etc<br />" +
 			"<br />" +
 			"More detailed help can be found in the <a href=\"https://www.smogon.com/sim/roomauth_guide\">roomauth guide</a><br />" +
 			"<br />" +
@@ -1235,7 +1244,7 @@ exports.commands = {
 			"- /tour end: Forcibly ends the tournament in the current room<br />" +
 			"- /tour start: Starts the tournament in the current room<br />" +
 			"<br />" +
-			"More detailed help can be found in the <a href=\"https://gist.github.com/verbiage/0846a552595349032fbe\">tournaments guide</a><br />" +
+			"More detailed help can be found <a href=\"https://gist.github.com/verbiage/0846a552595349032fbe\">here</a><br />" +
 			"</div>"
 		);
 	},

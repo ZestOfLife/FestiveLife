@@ -171,7 +171,7 @@ class CommandContext {
 		return true;
 	}
 	pmTransform(message) {
-		let prefix = `|pm|${this.user.getIdentity()}|${this.pmTarget.getIdentity()}|`;
+		let prefix = `|pm|${this.user.getIdentity()}|${this.pmTarget.getIdentity ? this.pmTarget.getIdentity() : ' ' + this.pmTarget}|`;
 		return message.split('\n').map(message => {
 			if (message.startsWith('||')) {
 				return prefix + '/text ' + message.slice(2);
@@ -193,7 +193,7 @@ class CommandContext {
 			if (this.pmTarget) {
 				data = this.pmTransform(data);
 				this.user.send(data);
-				if (this.pmTarget !== this.user) this.pmTarget.send(data);
+				if (this.pmTarget.send) this.pmTarget.send(data);
 			} else {
 				this.room.add(data);
 			}
@@ -209,7 +209,7 @@ class CommandContext {
 	}
 	errorReply(message) {
 		if (this.pmTarget) {
-			let prefix = '|pm|' + this.user.getIdentity() + '|' + this.pmTarget.getIdentity() + '|/error ';
+			let prefix = '|pm|' + this.user.getIdentity() + '|' + (this.pmTarget.getIdentity ? this.pmTarget.getIdentity() : ' ' + this.pmTarget) + '|/error ';
 			this.connection.send(prefix + message.replace(/\n/g, prefix));
 		} else {
 			this.sendReply('|html|<div class="message-error">' + Tools.escapeHTML(message).replace(/\n/g, '<br />') + '</div>');
@@ -228,7 +228,7 @@ class CommandContext {
 		if (this.pmTarget) {
 			data = this.pmTransform(data);
 			this.user.send(data);
-			if (this.pmTarget !== this.user) this.pmTarget.send(data);
+			if (this.pmTarget.send) this.pmTarget.send(data);
 			return;
 		}
 		this.room.add(data);
@@ -237,7 +237,7 @@ class CommandContext {
 		if (this.pmTarget) {
 			data = this.pmTransform(data);
 			this.user.send(data);
-			if (this.pmTarget !== this.user) this.pmTarget.send(data);
+			if (this.pmTarget.send) this.pmTarget.send(data);
 			return;
 		}
 		this.room.send(data);
@@ -673,10 +673,8 @@ let parse = exports.parse = function (message, room, user, connection, pmTarget,
 	} else if (message.slice(0, 4) === '>>> ') {
 		// multiline eval
 		message = '/evalbattle ' + message.slice(4);
-	} else if (message.startsWith('/me') && /[^A-Za-z0-9 ]/.test(message.charAt(3))) {
+	} else if (message.slice(0, 3) === '/me' && /[^A-Za-z0-9 ]/.test(message.charAt(3))) {
 		message = '/mee ' + message.slice(3);
-	} else if (message.startsWith('/ME') && /[^A-Za-z0-9 ]/.test(message.charAt(3))) {
-		message = '/MEE ' + message.slice(3);
 	}
 
 	if (VALID_COMMAND_TOKENS.includes(message.charAt(0)) && message.charAt(1) !== message.charAt(0)) {
@@ -754,10 +752,10 @@ let parse = exports.parse = function (message, room, user, connection, pmTarget,
 			// To guard against command typos, we now emit an error message
 			if (cmdToken === BROADCAST_TOKEN) {
 				if (/[a-z0-9]/.test(cmd.charAt(0))) {
-					return context.errorReply(`The command "${cmdToken}${fullCmd}" does not exist.`);
+					return context.errorReply("The command '" + cmdToken + fullCmd + "' was unrecognized.");
 				}
 			} else {
-				return context.errorReply(`The command "${cmdToken}${fullCmd}" does not exist. To send a message starting with "${cmdToken}${fullCmd}", type "${cmdToken}${cmdToken}${fullCmd}".`);
+				return context.errorReply("The command '" + cmdToken + fullCmd + "' was unrecognized. To send a message starting with '" + cmdToken + fullCmd + "', type '" + cmdToken.repeat(2) + fullCmd + "'.");
 			}
 		} else if (!VALID_COMMAND_TOKENS.includes(message.charAt(0)) && VALID_COMMAND_TOKENS.includes(message.trim().charAt(0))) {
 			message = message.trim();

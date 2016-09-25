@@ -40,7 +40,7 @@ let commands = exports.commands = {
 	authority: function (target, room, user, connection) {
 		if (target) {
 			let targetRoom = Rooms.search(target);
-			let unavailableRoom = targetRoom && targetRoom.checkModjoin(user);
+			let unavailableRoom = targetRoom && (targetRoom !== room && (targetRoom.modjoin || targetRoom.staffRoom) && !user.can('makeroom'));
 			if (targetRoom && !unavailableRoom) return this.parse('/roomauth1 ' + target);
 			return this.parse('/userauth ' + target);
 		}
@@ -70,23 +70,24 @@ let commands = exports.commands = {
 		"/auth [room] - Show what roomauth a room has.",
 		"/auth [user] - Show what global and roomauth a user has."],
 
-	'!me': true,
-	mee: 'me',
-	me: function (target, room, user) {
-		target = this.canTalk(`/${this.cmd} ${target || ''}`);
+	me: function (target, room, user, connection) {
+		// By default, /me allows a blank message
+		if (!target) target = '';
+		target = this.canTalk('/me ' + target);
 		if (!target) return;
 
-		if (this.message.startsWith(`/ME`)) {
-			const uppercaseIdentity = user.getIdentity().toUpperCase();
-			if (room) {
-				this.add(`|c|${uppercaseIdentity}|${target}`);
-			} else {
-				let msg = `|pm|${uppercaseIdentity}|${this.pmTarget.getIdentity()}|${target}`;
-				user.send(msg);
-				if (this.pmTarget !== user) this.pmTarget.send(msg);
-			}
-			return;
+		return target;
+	},
+
+	mee: function (target, room, user, connection) {
+		// By default, /mee allows a blank message
+		if (!target) target = '';
+		target = target.trim();
+		if (/[A-Za-z0-9]/.test(target.charAt(0))) {
+			return this.errorReply("To prevent confusion, /mee can't start with a letter or number.");
 		}
+		target = this.canTalk('/mee ' + target);
+		if (!target) return;
 
 		return target;
 	},
@@ -379,58 +380,15 @@ let commands = exports.commands = {
 			this.errorReply("You forgot the comma.");
 			return this.parse('/help msg');
 		}
-		this.pmTarget = targetUser;
+		this.pmTarget = (targetUser || this.targetUsername);
 		if (!targetUser) {
-			let error = `User ${this.targetUsername} not found. Did you misspell their name?`;
-			error = `|pm|${this.user.getIdentity()}| ${this.targetUsername}|/error ${error}`;
-			connection.send(error);
-			return;
+			this.errorReply("User " + this.targetUsername + " not found. Did you misspell their name?");
+			return this.parse('/help msg');
 		}
 
 		return CommandParser.Messages.send(target, this);
 	},
 	msghelp: ["/msg OR /whisper OR /w [username], [message] - Send a private message."],
-
-	'!invite': true,
-	inv: 'invite',
-	invite: function (target, room, user) {
-		if (!target) return this.parse('/help invite');
-		if (room) target = this.splitTarget(target);
-		let targetRoom = Rooms.search(target);
-		if (targetRoom && !targetRoom.checkModjoin(user)) {
-			targetRoom = undefined;
-		}
-
-		if (room) {
-			if (!this.targetUser) return this.errorReply(`The user "${this.targetUsername}" was not found.`);
-			if (!targetRoom) return this.errorReply(`The room "${target}" was not found.`);
-
-			return this.parse(`/pm ${this.targetUsername}, /invite ${targetRoom.id}`);
-		}
-
-		let targetUser = this.pmTarget;
-
-		if (!targetRoom || targetRoom === Rooms.global) return this.errorReply(`The room "${target}" was not found.`);
-		if (targetRoom.staffRoom && !targetUser.isStaff) return this.errorReply(`User "${this.targetUsername}" requires global auth to join room "${targetRoom.id}".`);
-		if (!targetUser) return this.errorReply(`The user "${this.targetUsername}" was not found.`);
-
-		if (!targetRoom.checkModjoin(targetUser)) {
-			if (room.getAuth(targetUser) !== ' ') {
-				return this.errorReply(`The user "${targetUser.name}" does not have permission to join "${targetRoom.title}".`);
-			}
-			this.parse(`/roomvoice ${targetUser.name}`, false, targetRoom);
-			if (!targetRoom.checkModjoin(targetUser)) {
-				if (room.getAuth(targetUser) !== ' ') {
-					return this.errorReply(`The user "${targetUser.name}" does not have permission to join "${targetRoom.title}".`);
-				}
-				return this.errorReply(`You do not have permission to invite people into this room.`);
-			}
-		}
-
-		return '/invite ' + targetRoom.id;
-	},
-	invitehelp: ["/invite [username] - Invites the player [username] to join the room you sent the command to.",
-		"(in a PM) /invite [roomname] - Invites the player you're PMing to join the room [roomname]."],
 
 	pminfobox: function (target, room, user, connection) {
 		if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
@@ -1101,8 +1059,16 @@ let commands = exports.commands = {
 		if (cmd === 'roomauth1') userLookup = '\n\nTo look up auth for a user, use /userauth ' + target;
 		let targetRoom = room;
 		if (target) targetRoom = Rooms.search(target);
-		if (!targetRoom || !targetRoom.checkModjoin(user)) return this.errorReply(`The room "${target}" does not exist.`);
+		if (!targetRoom) return this.errorReply("The room '" + target + "' does not exist.");
 		if (!targetRoom.auth) return this.sendReply("/roomauth - The room '" + (targetRoom.title || target) + "' isn't designed for per-room moderation and therefore has no auth list." + userLookup);
+
+		let cannotJoin = !user.can('makeroom') && (
+			targetRoom.staffRoom ||
+			targetRoom.isPrivate && targetRoom.modjoin &&
+			(!targetRoom.auth || !targetRoom.auth[user.userid])
+		);
+		let unavailableRoom = !user.inRooms.has(targetRoom.id) && cannotJoin;
+		if (unavailableRoom) return this.errorReply("The room '" + target + "' does not exist.");
 
 		let rankLists = {};
 		for (let u in targetRoom.auth) {
@@ -1320,6 +1286,28 @@ let commands = exports.commands = {
 		if (userid !== toId(this.inputUsername)) this.add('|unlink|' + toId(this.inputUsername));
 	},
 	warnhelp: ["/warn OR /k [username], [reason] - Warns a user showing them the Pok\u00e9mon Showdown Rules and [reason] in an overlay. Requires: % @ # & ~"],
+	
+	gwarn: 'globalwarn',
+	globalwarn: function (target, room, user) {
+		if (!target) return this.parse('/help globalwarn');
+		if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
+
+		target = this.splitTarget(target);
+		let targetUser = this.targetUser;
+		if (!targetUser || !targetUser.connected) return this.errorReply("User '" + this.targetUsername + "' not found.");
+		if (target.length > MAX_REASON_LENGTH) {
+			return this.errorReply("The reason is too long. It cannot exceed " + MAX_REASON_LENGTH + " characters.");
+		}
+		if (!this.can('globalwarn', targetUser)) return false;
+
+		this.addModCommand("" + targetUser.name + " was warned by " + user.name + "." + (target ? " (" + target + ")" : ""));
+		this.globalModlog("WARN", targetUser, " by " + user.name + (target ? ": " + target : ""));
+		targetUser.send('|c|~|/warn ' + target);
+		let userid = targetUser.getLastId();
+		this.add('|unlink|' + userid);
+		if (userid !== toId(this.inputUsername)) this.add('|unlink|' + toId(this.inputUsername));
+	},
+	globalwarnhelp: ["/globalwarn OR /gwarn [username], [reason] - Warns a user from anywhere showing them the Pok\u00e9mon Showdown Rules and [reason] in an overlay. Requires: % @ & ~"],
 
 	redirect: 'redir',
 	redir: function (target, room, user, connection) {
@@ -1936,7 +1924,7 @@ let commands = exports.commands = {
 	announce: function (target, room, user) {
 		if (!target) return this.parse('/help announce');
 
-		if (room && !this.can('announce', null, room)) return false;
+		if (!this.can('announce', null, room)) return false;
 
 		target = this.canTalk(target);
 		if (!target) return;
@@ -2090,37 +2078,6 @@ let commands = exports.commands = {
 	},
 	blacklisthelp: ["/blacklist [username], [reason] - Blacklists the user from the room you are in for a year. Requires: # & ~"],
 
-	blacklistname: function (target, room, user) {
-		if (!target) return this.parse('/help blacklistname');
-		if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
-		if (!this.can('editroom', null, room)) return false;
-		if (!room.chatRoomData) {
-			return this.errorReply("This room is not going to last long enough for a blacklist to matter - just ban the user");
-		}
-
-		let parts = target.split('|');
-		if (parts.length < 2) {
-			return this.errorReply("Blacklists require a reason.");
-		}
-		let reason = parts[1];
-		let targets = parts[0].split(',').map(s => toId(s));
-
-		for (let i = 0; i < targets.length; i++) {
-			let userid = targets[i];
-
-			Punishments.roomBlacklist(room, null, null, userid, reason);
-
-			let confirmed = Users.isConfirmed(userid);
-			if (Users.isConfirmed(userid)) {
-				Monitor.log("[CrisisMonitor] Confirmed user " + userid + (confirmed !== userid ? " (" + confirmed + ")" : "") + " was nameblacklisted from " + room.id + " by " + user.name + ", and should probably be demoted.");
-			}
-		}
-
-		this.addModCommand("" + targets.join(', ') + (targets.length > 1 ? " were" : " was") + " nameblacklisted by " + user.name + ".");
-		return true;
-	},
-	blacklistnamehelp: ["/blacklistname [username1, username2, etc.] | reason - Blacklists the given username(s) from the room you are in for a year. Requires: # & ~"],
-
 	unab: 'unblacklist',
 	unblacklist: function (target, room, user) {
 		if (!target) return this.parse('/help unblacklist');
@@ -2163,17 +2120,14 @@ let commands = exports.commands = {
 
 		if (user.can('ban')) {
 			const subMap = Punishments.roomIps.get(room.id);
-
-			if (subMap) {
-				ips = '/ips';
-				subMap.forEach((punishment, ip) => {
-					const [punishType, id] = punishment;
-					if (punishType === 'BLACKLIST') {
-						if (!blMap.has(id)) blMap.set(id, []);
-						blMap.get(id).push(ip);
-					}
-				});
-			}
+			ips = '/ips';
+			subMap.forEach((punishment, ip) => {
+				const [punishType, id] = punishment;
+				if (punishType === 'BLACKLIST') {
+					if (!blMap.has(id)) blMap.set(id, []);
+					blMap.get(id).push(ip);
+				}
+			});
 		}
 
 		let buf = `Blacklist for room ${room.id}:<br />`;
