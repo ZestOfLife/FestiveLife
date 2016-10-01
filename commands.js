@@ -1752,6 +1752,19 @@ let commands = exports.commands = {
 	},
 	modnotehelp: ["/modnote [note] - Adds a moderator note that can be read through modlog. Requires: % @ * # & ~"],
 
+	gmn: 'globalmodnote',
+	globalmodnote: function (target, room, user, connection) {
+		if (!target) return this.parse('/help globalmodnotehelp');
+		if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
+
+		if (target.length > MAX_REASON_LENGTH) {
+			return this.errorReply("The note is too long. It cannot exceed " + MAX_REASON_LENGTH + " characters.");
+		}
+		if (!this.can('recieveglobalauthmessages', null)) return false;
+		return this.globalModlog("(" + user.name + " notes: " + target + ")");
+	},
+	globalmodnotehelp: ["/globalmodnote [note] - Adds a moderator note in the global modlog. Requires: % @ * # & ~"],
+	
 	globalpromote: 'promote',
 	promote: function (target, room, user, connection, cmd) {
 		if (!target) return this.parse('/help promote');
