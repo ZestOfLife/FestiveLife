@@ -344,6 +344,7 @@ exports.grouplist = [
 		alts: '%u',
 		bypassblocks: 'u%@&~',
 		receiveauthmessages: true,
+		receiveglobalauthmessages: true,
 		tournamentsmoderation: true,
 		jeopardy: true,
 		joinbattle: true,
