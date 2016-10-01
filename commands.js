@@ -1286,7 +1286,7 @@ let commands = exports.commands = {
 		if (userid !== toId(this.inputUsername)) this.add('|unlink|' + toId(this.inputUsername));
 	},
 	warnhelp: ["/warn OR /k [username], [reason] - Warns a user showing them the Pok\u00e9mon Showdown Rules and [reason] in an overlay. Requires: % @ # & ~"],
-	
+
 	gwarn: 'globalwarn',
 	globalwarn: function (target, room, user) {
 		if (!target) return this.parse('/help globalwarn');
@@ -1764,7 +1764,7 @@ let commands = exports.commands = {
 		return this.globalModlog("(" + user.name + " notes: " + target + ")");
 	},
 	globalmodnotehelp: ["/globalmodnote [note] - Adds a moderator note in the global modlog. Requires: % @ * # & ~"],
-	
+
 	globalpromote: 'promote',
 	promote: function (target, room, user, connection, cmd) {
 		if (!target) return this.parse('/help promote');
@@ -2075,12 +2075,12 @@ let commands = exports.commands = {
 			if (!room.isPrivate && room.chatRoomData) {
 				let alts = targetUser.getAlts();
 				let acAccount = (targetUser.autoconfirmed !== userid && targetUser.autoconfirmed);
-			if (alts.length) {
-				this.privateModCommand("(" + name + "'s " + (acAccount ? " ac account: " + acAccount + ", " : "") + "blacklisted alts: " + alts.join(", ") + ")");
-			} else if (acAccount) {
-				this.privateModCommand("(" + name + "'s ac account: " + acAccount + ")");
+				if (alts.length) {
+					this.privateModCommand("(" + name + "'s " + (acAccount ? " ac account: " + acAccount + ", " : "") + "blacklisted alts: " + alts.join(", ") + ")");
+				} else if (acAccount) {
+					this.privateModCommand("(" + name + "'s ac account: " + acAccount + ")");
+				}
 			}
-		}
 			this.add('|unlink|hide|' + userid);
 			if (userid !== toId(this.inputUsername)) this.add('|unlink|hide|' + toId(this.inputUsername));
 
@@ -2090,7 +2090,7 @@ let commands = exports.commands = {
 			Punishments.roomBlacklist(room, targetUser, null, null, target);
 			return true;
 		},
-		
+	
 		remove: function (target, room, user) {
 			if (!target) return this.parse('/help unblacklist');
 			if (!this.can('editroom', null, room)) return false;
@@ -2112,7 +2112,7 @@ let commands = exports.commands = {
 
 			if (!user.can('ban', null, room)) return;
 			if (!room.chatRoomData) return this.errorReply("This room does not support blacklists.");
-	
+
 			const subMap = Punishments.roomUserids.get(room.id);
 			if (!subMap) {
 				return this.sendReply("This room has no blacklisted users.");
@@ -2122,10 +2122,10 @@ let commands = exports.commands = {
 
 			subMap.forEach((punishment, userid) => {
 				const [punishType, id, expireTime] = punishment;
-			if (punishType === 'BLACKLIST') {
-						if (!blMap.has(id)) blMap.set(id, [expireTime]);
-					if (id !== userid) blMap.get(id).push(userid);
-				}
+				if (punishType === 'BLACKLIST') {
+				if (!blMap.has(id)) blMap.set(id, [expireTime]);
+				if (id !== userid) blMap.get(id).push(userid);
+			}
 			});
 
 			if (user.can('ban')) {
@@ -2155,7 +2155,7 @@ let commands = exports.commands = {
 		},
 		"": function (target, room, user) {
 			return this.parse('/blacklisthelp');
-		}
+		},
 	},
 	blacklisthelp: ["/blacklist add [username], [reason] - Blacklists the user from the room you are in for a year. Requires: # & ~",
 			"/blacklist remove [username] - Unblacklists the user from the room you are in. Requires: # & ~",
