@@ -2026,41 +2026,42 @@ let commands = exports.commands = {
 	hidetexthelp: ["/hidetext [username] - Removes a locked or banned user's messages from chat (includes users banned from the room). Requires: % (global only), @ * # & ~"],
 
 	ab: 'blacklist',
-	blacklist: function (target, room, user) {
-		if (!target) return this.parse('/help blacklist');
-		if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
+	blacklist: {
+		add: function (target, room, user) {
+			if (!target) return this.parse('/help blacklist');
+			if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
 
-		target = this.splitTarget(target);
-		const targetUser = this.targetUser;
-		if (!targetUser) return this.errorReply("User '" + this.targetUsername + "' not found.");
-		if (!this.can('editroom', targetUser, room)) return false;
-		if (!room.chatRoomData) {
-			return this.errorReply("This room is not going to last long enough for a blacklist to matter - just ban the user");
-		}
-		if (target.length > MAX_REASON_LENGTH) {
-			return this.errorReply("The reason is too long. It cannot exceed " + MAX_REASON_LENGTH + " characters.");
-		}
-		if (!target) {
-			return this.errorReply("Blacklists require a reason.");
-		}
-		const name = targetUser.getLastName();
-		const userid = targetUser.getLastId();
+			target = this.splitTarget(target);
+			const targetUser = this.targetUser;
+			if (!targetUser) return this.errorReply("User '" + this.targetUsername + "' not found.");
+			if (!this.can('editroom', targetUser, room)) return false;
+			if (!room.chatRoomData) {
+				return this.errorReply("This room is not going to last long enough for a blacklist to matter - just ban the user");
+			}
+			if (target.length > MAX_REASON_LENGTH) {
+				return this.errorReply("The reason is too long. It cannot exceed " + MAX_REASON_LENGTH + " characters.");
+			}
+			if (!target) {
+				return this.errorReply("Blacklists require a reason.");
+			}
+			const name = targetUser.getLastName();
+			const userid = targetUser.getLastId();
 
-		if (targetUser.confirmed && room.isPrivate !== true) {
-			Monitor.log("[CrisisMonitor] Confirmed user " + targetUser.name + (targetUser.confirmed !== targetUser.userid ? " (" + targetUser.confirmed + ")" : "") + " was blacklisted from " + room.id + " by " + user.name + ", and should probably be demoted.");
-		}
+			if (targetUser.confirmed && room.isPrivate !== true) {
+				Monitor.log("[CrisisMonitor] Confirmed user " + targetUser.name + (targetUser.confirmed !== targetUser.userid ? " (" + targetUser.confirmed + ")" : "") + " was blacklisted from " + room.id + " by " + user.name + ", and should probably be demoted.");
+			}
 
-		if (targetUser in room.users || user.can('lock')) {
-			targetUser.popup(
-				"|modal||html|<p>" + Tools.escapeHTML(user.name) + " has blacklisted you from the room " + room.id + ".</p>" + (target ? "<p>Reason: " + Tools.escapeHTML(target) + "</p>" : "") +
-				"<p>To appeal the ban, PM the staff member that blacklisted you" + (!room.battle && room.auth ? " or a room owner. </p><p><button name=\"send\" value=\"/roomauth " + room.id + "\">List Room Staff</button></p>" : ".</p>")
-			);
-		}
+			if (targetUser in room.users || user.can('lock')) {
+				targetUser.popup(
+					"|modal||html|<p>" + Tools.escapeHTML(user.name) + " has blacklisted you from the room " + room.id + ".</p>" + (target ? "<p>Reason: " + Tools.escapeHTML(target) + "</p>" : "") +
+					"<p>To appeal the ban, PM the staff member that blacklisted you" + (!room.battle && room.auth ? " or a room owner. </p><p><button name=\"send\" value=\"/roomauth " + room.id + "\">List Room Staff</button></p>" : ".</p>")
+				);
+			}
 
-		this.addModCommand("" + name + " was blacklisted by " + user.name + "." + (target ? " (" + target + ")" : ""), " (" + targetUser.latestIp + ")");
-		if (!room.isPrivate && room.chatRoomData) {
-			let alts = targetUser.getAlts();
-			let acAccount = (targetUser.autoconfirmed !== userid && targetUser.autoconfirmed);
+			this.addModCommand("" + name + " was blacklisted by " + user.name + "." + (target ? " (" + target + ")" : ""), " (" + targetUser.latestIp + ")");
+			if (!room.isPrivate && room.chatRoomData) {
+				let alts = targetUser.getAlts();
+				let acAccount = (targetUser.autoconfirmed !== userid && targetUser.autoconfirmed);
 			if (alts.length) {
 				this.privateModCommand("(" + name + "'s " + (acAccount ? " ac account: " + acAccount + ", " : "") + "blacklisted alts: " + alts.join(", ") + ")");
 			} else if (acAccount) {
@@ -2076,10 +2077,8 @@ let commands = exports.commands = {
 		Punishments.roomBlacklist(room, targetUser, null, null, target);
 		return true;
 	},
-	blacklisthelp: ["/blacklist [username], [reason] - Blacklists the user from the room you are in for a year. Requires: # & ~"],
-
-	unab: 'unblacklist',
-	unblacklist: function (target, room, user) {
+		
+	remove: function (target, room, user) {
 		if (!target) return this.parse('/help unblacklist');
 		if (!this.can('editroom', null, room)) return false;
 
@@ -2094,10 +2093,8 @@ let commands = exports.commands = {
 			this.errorReply("User '" + target + "' is not blacklisted.");
 		}
 	},
-	unblacklisthelp: ["/unblacklist [username] - Unblacklists the user from the room you are in. Requires: # & ~"],
 
-	showbl: 'showblacklist',
-	showblacklist: function (target, room, user) {
+	show: function (target, room, user) {
 		if (!this.can('mute', null, room)) return false;
 
 		if (!user.can('ban', null, room)) return;
@@ -2143,7 +2140,9 @@ let commands = exports.commands = {
 
 		this.sendReplyBox(buf);
 	},
-	showblacklishelp: ["/showblacklist OR /showbl - show a list of blacklisted users in the room"],
+	blacklisthelp: ["/blacklist add [username], [reason] - Blacklists the user from the room you are in for a year. Requires: # & ~",
+			"/blacklist remove [username] - Unblacklists the user from the room you are in. Requires: # & ~",
+			"/blacklist show - Show a list of blacklisted users in the room. Requires: % @ * # & ~"],
 
 	modlog: function (target, room, user, connection) {
 		let lines = 0;
