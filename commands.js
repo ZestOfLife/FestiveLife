@@ -2068,77 +2068,78 @@ let commands = exports.commands = {
 				this.privateModCommand("(" + name + "'s ac account: " + acAccount + ")");
 			}
 		}
-		this.add('|unlink|hide|' + userid);
-		if (userid !== toId(this.inputUsername)) this.add('|unlink|hide|' + toId(this.inputUsername));
+			this.add('|unlink|hide|' + userid);
+			if (userid !== toId(this.inputUsername)) this.add('|unlink|hide|' + toId(this.inputUsername));
 
-		if (!room.isPrivate && room.chatRoomData) {
-			this.globalModlog("BLACKLIST", targetUser, " by " + user.name + (target ? ": " + target : ""));
-		}
-		Punishments.roomBlacklist(room, targetUser, null, null, target);
-		return true;
-	},
-		
-	remove: function (target, room, user) {
-		if (!target) return this.parse('/help unblacklist');
-		if (!this.can('editroom', null, room)) return false;
-
-		const name = Punishments.roomUnblacklist(room, target);
-
-		if (name) {
-			this.addModCommand("" + name + " was unblacklisted by " + user.name + ".");
 			if (!room.isPrivate && room.chatRoomData) {
-				this.globalModlog("UNBLACKLIST", name, " by " + user.name);
+				this.globalModlog("BLACKLIST", targetUser, " by " + user.name + (target ? ": " + target : ""));
 			}
-		} else {
-			this.errorReply("User '" + target + "' is not blacklisted.");
-		}
-	},
+			Punishments.roomBlacklist(room, targetUser, null, null, target);
+			return true;
+		},
+		
+		remove: function (target, room, user) {
+			if (!target) return this.parse('/help unblacklist');
+			if (!this.can('editroom', null, room)) return false;
 
-	show: function (target, room, user) {
-		if (!this.can('mute', null, room)) return false;
+			const name = Punishments.roomUnblacklist(room, target);
 
-		if (!user.can('ban', null, room)) return;
-		if (!room.chatRoomData) return this.errorReply("This room does not support blacklists.");
+			if (name) {
+				this.addModCommand("" + name + " was unblacklisted by " + user.name + ".");
+				if (!room.isPrivate && room.chatRoomData) {
+					this.globalModlog("UNBLACKLIST", name, " by " + user.name);
+				}
+			} else {
+				this.errorReply("User '" + target + "' is not blacklisted.");
+			}
+		},
 
-		const subMap = Punishments.roomUserids.get(room.id);
-		if (!subMap) {
-			return this.sendReply("This room has no blacklisted users.");
-		}
-		let blMap = new Map();
-		let ips = '';
+		show: function (target, room, user) {
+			if (!this.can('mute', null, room)) return false;
 
-		subMap.forEach((punishment, userid) => {
-			const [punishType, id, expireTime] = punishment;
+			if (!user.can('ban', null, room)) return;
+			if (!room.chatRoomData) return this.errorReply("This room does not support blacklists.");
+	
+			const subMap = Punishments.roomUserids.get(room.id);
+			if (!subMap) {
+				return this.sendReply("This room has no blacklisted users.");
+			}
+			let blMap = new Map();
+			let ips = '';
+
+			subMap.forEach((punishment, userid) => {
+				const [punishType, id, expireTime] = punishment;
 			if (punishType === 'BLACKLIST') {
-				if (!blMap.has(id)) blMap.set(id, [expireTime]);
-				if (id !== userid) blMap.get(id).push(userid);
-			}
-		});
-
-		if (user.can('ban')) {
-			const subMap = Punishments.roomIps.get(room.id);
-			ips = '/ips';
-			subMap.forEach((punishment, ip) => {
-				const [punishType, id] = punishment;
-				if (punishType === 'BLACKLIST') {
-					if (!blMap.has(id)) blMap.set(id, []);
-					blMap.get(id).push(ip);
+						if (!blMap.has(id)) blMap.set(id, [expireTime]);
+					if (id !== userid) blMap.get(id).push(userid);
 				}
 			});
+
+			if (user.can('ban')) {
+				const subMap = Punishments.roomIps.get(room.id);
+				ips = '/ips';
+				subMap.forEach((punishment, ip) => {
+					const [punishType, id] = punishment;
+					if (punishType === 'BLACKLIST') {
+						if (!blMap.has(id)) blMap.set(id, []);
+						blMap.get(id).push(ip);
+					}
+				});
+			}
+
+			let buf = `Blacklist for room ${room.id}:<br />`;
+
+			blMap.forEach((data, userid) => {
+				const [expireTime, ...alts] = data;
+				const expiresIn = new Date(expireTime).getTime() - Date.now();
+				const expiresDays = Math.round(expiresIn / 1000 / 60 / 60 / 24);
+				buf += `- <strong>${userid}</strong>, for ${expiresDays} day${Tools.plural(expiresDays)}`;
+				if (alts.length) buf += `, alts${ips}: ${alts.join(', ')}`;
+				buf += `<br />`;
+			});
+
+			this.sendReplyBox(buf);
 		}
-
-		let buf = `Blacklist for room ${room.id}:<br />`;
-
-		blMap.forEach((data, userid) => {
-			const [expireTime, ...alts] = data;
-			const expiresIn = new Date(expireTime).getTime() - Date.now();
-			const expiresDays = Math.round(expiresIn / 1000 / 60 / 60 / 24);
-			buf += `- <strong>${userid}</strong>, for ${expiresDays} day${Tools.plural(expiresDays)}`;
-			if (alts.length) buf += `, alts${ips}: ${alts.join(', ')}`;
-			buf += `<br />`;
-		});
-
-		this.sendReplyBox(buf);
 	},
 	blacklisthelp: ["/blacklist add [username], [reason] - Blacklists the user from the room you are in for a year. Requires: # & ~",
 			"/blacklist remove [username] - Unblacklists the user from the room you are in. Requires: # & ~",
