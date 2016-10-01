@@ -2139,6 +2139,9 @@ let commands = exports.commands = {
 			});
 
 			this.sendReplyBox(buf);
+		},
+		"": function (target, room, user) {
+			return this.parse('/blacklisthelp');
 		}
 	},
 	blacklisthelp: ["/blacklist add [username], [reason] - Blacklists the user from the room you are in for a year. Requires: # & ~",
