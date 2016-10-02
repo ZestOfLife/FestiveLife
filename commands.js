@@ -1754,7 +1754,7 @@ let commands = exports.commands = {
 
 	gmn: 'globalmodnote',
 	globalmodnote: function (target, room, user, connection) {
-		if (!target) return this.parse('/help globalmodnotehelp');
+		if (!target) return this.parse('/help globalmodnote');
 		if (!this.canTalk()) return this.errorReply("You cannot do this while unable to talk.");
 
 		if (target.length > MAX_REASON_LENGTH) {
