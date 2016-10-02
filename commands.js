@@ -1760,7 +1760,7 @@ let commands = exports.commands = {
 		if (target.length > MAX_REASON_LENGTH) {
 			return this.errorReply("The note is too long. It cannot exceed " + MAX_REASON_LENGTH + " characters.");
 		}
-		if (!this.can('recieveglobalauthmessages', null)) return false;
+		if (!this.can('receiveglobalauthmessages', null)) return false;
 		return this.globalModlog("(" + user.name + " notes: " + target + ")");
 	},
 	globalmodnotehelp: ["/globalmodnote [note] - Adds a moderator note in the global modlog. Requires: % @ * # & ~"],
